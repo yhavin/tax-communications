@@ -16,14 +16,15 @@ class Logger:
             os.makedirs("logs")
 
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S%z")
-        filename = os.path.join("logs", f"matches_{self.timestamp}.txt")
+        filename = os.path.join("logs", f"log_{self.timestamp}.txt")
 
         self.log = open(filename, "w")
         self.terminal = sys.stdout
 
-    def write(self, message):
-        self.terminal.write(message)
-        self.terminal.flush()
+    def write(self, message, print_to_terminal=True):
+        if print_to_terminal:
+            self.terminal.write(message)
+            self.terminal.flush()
         self.log.write(message)
         self.log.flush()
 
