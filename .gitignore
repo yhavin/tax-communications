@@ -6,3 +6,6 @@ files/
 investors.xlsx
 investors.csv
 matches.csv
+logs/
+dumps/
+cache/
