@@ -15,7 +15,7 @@ import requests
 import pandas as pd
 import pdfplumber
 
-import msal_auth
+import auth
 from logger import logger
 
 
@@ -132,6 +132,7 @@ class K1BatchProcessor:
         merged_df = merged_df.drop(columns=["path", "investment_name_from_pdf", "issuing_entity_from_pdf", "receiving_entity_from_pdf"], axis=1)
         merged_df["email_status"] = merged_df["matched_k1_filename"].apply(lambda match: "file found" if pd.notna(match) else None)
 
+        merged_df = merged_df[merged_df["matched_k1_filename"].notna()]
         merged_df.to_csv(os.path.join("queue", f"matched_{logger.timestamp}.csv"), index=False)
 
 
@@ -142,39 +143,3 @@ if __name__ == "__main__":
     k.match_files_and_keys()
     # k.print_k1_array()
     logger.close()
-
-
-
-### DISREGARD
-### The following method was used when we were parsing filenames to figure out issuing and receiving entities
-### Now we are mining the PDFs to extract the names from the schedule K itself
-
-    # def _create_matching_keys(self):
-    #     """Create matching keys to match K-1 files to investor rows."""
-    #     self.k1_file_matching_keys = []
-
-    #     stop_characters_translation_table = str.maketrans({
-    #         " ": "",
-    #         ".": "",
-    #         ",": ""
-    #     })
-
-    #     for k1_file_path in self.k1_file_paths:
-    #         split_folder_and_file = k1_file_path.split("/")
-    #         investment_name = split_folder_and_file[0]
-    #         k1_filename = split_folder_and_file[1]  # Example: 23P_3189 GOTA FOREST PLACE LLC 1 GOTA LLC.pdf
-
-    #         split_filename = k1_filename.split(" ")
-    #         roth_id = split_filename[0][4:]  # May use this for matching at some point
-    #         split_filename = split_filename[1:]  # Remove Roth ID, for example: GOTA FOREST PLACE LLC 1 GOTA LLC.pdf
-
-    #         for i, filename_part in enumerate(split_filename):
-    #             if filename_part.isdigit():
-    #                 number_index = i
-    #                 break
-
-    #         issuing_entity = "".join(split_filename[:number_index])
-    #         receiving_entity = "".join(split_filename[number_index + 1:])[:-4]
-
-    #         matching_key = f"{investment_name}#{issuing_entity}#{receiving_entity}".lower().translate(stop_characters_translation_table)
-    #         self.k1_file_matching_keys.append((k1_file_path, matching_key))
