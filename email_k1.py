@@ -8,22 +8,19 @@ Author: Yakir Havin
 import base64
 import json
 import os
-import re
 
 import requests
 import pandas as pd
 import pdfplumber
 
 import msal_auth
+from logger import logger
 
 
 class K1BatchProcessor:
     def __init__(self):
         self.k1_array = []
         self._gather_files()
-        self._extract_entities()
-        self._create_matching_keys()
-        self.match_files_and_keys()
 
     def _gather_files(self):
         """Gather K-1 PDFs from input folder."""
@@ -41,7 +38,8 @@ class K1BatchProcessor:
                             "receiving_entity": None
                         })
 
-    def _extract_entities(self):
+    def extract_entities(self):
+        """Attempt to extract issuing and receiving entity from PDFs."""
         for k1_info in self.k1_array:
             print("EXTRACT: ", k1_info["path"])
             file_path = os.path.join("files", k1_info["path"])
@@ -59,7 +57,8 @@ class K1BatchProcessor:
                                 k1_info["receiving_entity"] = receiving_entity
                         break
 
-    def _create_matching_keys(self):
+    def create_matching_keys(self):
+        """Create keys to match PDFs to investors table."""
         stop_characters_translation_table = str.maketrans({
             " ": "",
             ".": "",
@@ -72,26 +71,29 @@ class K1BatchProcessor:
 
     def match_files_and_keys(self):
         """Match K-1 files to investors."""
-        temp_df = pd.read_excel("investors.xlsx")
-        temp_df.to_csv("investors.csv", index=False)  # Copies xlsx to csv
+        investors_df = pd.read_excel("investors.xlsx")
 
-        investors_df = pd.read_csv("investors.csv")
         k1_matching_key_df = pd.DataFrame(self.k1_array)
-        print("K-1 FILES:\n", k1_matching_key_df["investment_name"].value_counts())
+        print("\nK-1 FILES:\n", k1_matching_key_df["investment_name"].value_counts())
         
         merged_df = pd.merge(investors_df, k1_matching_key_df, on="k1_matching_key", how="left", suffixes=("", "_from_pdf"))
         merged_df["matched_k1_filename"] = merged_df["path"]
-        print("MATCHED ROWS:\n", merged_df[merged_df["matched_k1_filename"].notna()]["investment_name"].value_counts())
+        print("\nMATCHED ROWS:\n", merged_df[merged_df["matched_k1_filename"].notna()]["investment_name"].value_counts())
 
-        print("UNMATCHED K-1 FILES:\n", k1_matching_key_df[~k1_matching_key_df["k1_matching_key"].isin(merged_df["k1_matching_key"])])
+        print("\nUNMATCHED K-1 FILES:\n", k1_matching_key_df[~k1_matching_key_df["k1_matching_key"].isin(merged_df["k1_matching_key"])])
 
         merged_df = merged_df.drop(columns=["path", "investment_name_from_pdf", "issuing_entity_from_pdf", "receiving_entity_from_pdf"], axis=1)
         merged_df["email_status"] = merged_df["matched_k1_filename"].apply(lambda match: "file found" if pd.notna(match) else None)
 
-        merged_df.to_csv("matches.csv", index=False)
+        merged_df.to_csv(os.path.join("logs", f"matches_{logger.timestamp}.csv"), index=False)
 
 
-k = K1BatchProcessor()
+if __name__ == "__main__":
+    k = K1BatchProcessor()
+    k.extract_entities()
+    k.create_matching_keys()
+    k.match_files_and_keys()
+    logger.close()
 
 
 
