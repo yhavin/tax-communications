@@ -22,14 +22,27 @@ from logger import logger
 
 
 class K1BatchProcessor:
-    def __init__(self, *, sender: str, internal_recipients: list, tax_year: str, test_mode: bool=True, email_limit: Optional[int]=None, reset_status: bool=False):
+    def __init__(self, *, sender: str, internal_recipients: list, tax_year: str, test_mode: bool=True, email_limit: Optional[int]=None, skip_cache_load: bool=False, reset_status: bool=False):
+        """
+        Process and email a batch of K-1 files.
+
+        Args:
+            sender: Email address from which to send emails.
+            internal_recipients: List of internal email addresses to cc on every email.
+            tax_year: The tax year of the K-1 files.
+            test_mode: If True, sends all emails to `sender` (defaults to True for safety).
+            email_limit: Limit the number of emails sent (useful for testing), otherwise None to send all.
+            skip_cache_load: If True, will not use cache to load pre-extracted data to the `k1_array`.
+            reset_status: If True, resets the `email_status` and `email_batch_timestamp` columns in `investors.xlsx`.
+        """
         self.sender = sender
         self.internal_recipients = internal_recipients
         self.tax_year = tax_year
         self.test_mode = test_mode
         self.email_limit = email_limit
+        self.skip_cache_load = skip_cache_load
         self.reset_status = reset_status
-        print(f"BEGIN EXECUTION: sender={self.sender}, tax_year={self.tax_year}, test_mode={self.test_mode}, email_limit={self.email_limit}, reset_status={self.reset_status}\n")
+        print(f"BEGIN EXECUTION: sender={self.sender}, tax_year={self.tax_year}, test_mode={self.test_mode}, email_limit={self.email_limit}, skip_cache_load={self.skip_cache_load}, reset_status={self.reset_status}\n")
 
         self._ensure_directory_structure()
         self._save_investors_snapshot()
@@ -39,7 +52,8 @@ class K1BatchProcessor:
 
         self.k1_array = []
         self.cache = "k1_array_cache.pkl"
-        self._load_cache()
+        if not skip_cache_load:
+            self._load_cache()
         self._gather_files()
 
     def _ensure_directory_structure(self):
@@ -53,7 +67,7 @@ class K1BatchProcessor:
     def _save_investors_snapshot(self):
         """Create snapshots of investors.xlsx before any changes get made."""
         try:
-            shutil.copy("investors.xlsx", os.path.join("snapshots", f"investors_{logger.timestamp}.xlsx"))
+            shutil.copy("investors.xlsx", os.path.join("snapshots", f"{logger.timestamp}_investors.xlsx"))
         except FileNotFoundError as e:
             print(e)
 
@@ -65,7 +79,7 @@ class K1BatchProcessor:
         investors_df.to_excel("investors.xlsx", index=False)
 
     def _load_cache(self):
-        """Attempt to load K-1 entity array from cache."""
+        """Load K-1 entity array from cache."""
         if os.path.exists(os.path.join("cache", self.cache)):
             with open(os.path.join("cache", self.cache), "rb") as f:
                 self.k1_array = pickle.load(f)
@@ -173,7 +187,7 @@ class K1BatchProcessor:
         unmatched_k1_files_df = k1_matching_key_df[~k1_matching_key_df["k1_matching_key"].isin(merged_df["k1_matching_key"])].sort_values(by=["investment_name", "receiving_entity"])
         print("UNMATCHED FILES:", len(unmatched_k1_files_df), "\n")
         print(f"MATCH SUCCESS: {1 - (len(unmatched_k1_files_df) / len(k1_matching_key_df)):.2%}\n")
-        unmatched_k1_files_df.to_csv(os.path.join("logs", f"unmatched_{logger.timestamp}.csv"))
+        unmatched_k1_files_df.to_csv(os.path.join("logs", f"{logger.timestamp}_unmatched.csv"), index=False)
 
         merged_df = merged_df.drop(columns=["path", "investment_name_from_pdf", "issuing_entity_from_pdf", "receiving_entity_from_pdf"], axis=1)
         merged_df["email_status"] = merged_df.apply(
@@ -184,7 +198,7 @@ class K1BatchProcessor:
         merged_df.to_excel("investors.xlsx", index=False)  # Update main table with filename and status columns
 
         merged_df = merged_df[merged_df["matched_k1_filename"].notna()]
-        merged_df.to_csv(os.path.join("logs", f"matched_{logger.timestamp}.csv"))  # For logging
+        # merged_df.to_csv(os.path.join("logs", f"matched_{logger.timestamp}.csv", index=False))  # For logging
 
     def send_emails(self):
         """Email K-1 PDFs to investors."""
