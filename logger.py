@@ -16,7 +16,7 @@ class Logger:
             os.makedirs("logs")
 
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S%z")
-        filename = os.path.join("logs", f"log_{self.timestamp}.txt")
+        filename = os.path.join("logs", f"{self.timestamp}_log.txt")
 
         self.log = open(filename, "w")
         self.terminal = sys.stdout
