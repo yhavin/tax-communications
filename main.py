@@ -11,8 +11,6 @@ import os
 import pickle
 import re
 import shutil
-import warnings
-warnings.simplefilter(action="ignore", category=FutureWarning)  # Suppress erroneous FutureWarning
 from typing import Optional
 
 import requests
@@ -24,14 +22,18 @@ from logger import logger
 
 
 class K1BatchProcessor:
-    def __init__(self, *, tax_year: str, test_mode: bool=True, email_limit: Optional[int]=None):
+    def __init__(self, *, tax_year: str, test_mode: bool=True, email_limit: Optional[int]=None, reset_status: bool=False):
         self.tax_year = tax_year
         self.test_mode = test_mode
         self.email_limit = email_limit
-        print(f"START: tax_year={self.tax_year}, test_mode={self.test_mode}, email_limit={self.email_limit}\n")
+        self.reset_status = reset_status
+        print(f"BEGIN EXECUTION: tax_year={self.tax_year}, test_mode={self.test_mode}, email_limit={self.email_limit}, reset_status={self.reset_status}\n")
 
         self._ensure_directory_structure()
         self._save_investors_snapshot()
+
+        if self.reset_status:
+            self._reset_status()
 
         self.k1_array = []
         self.cache = "k1_array_cache.pkl"
@@ -40,7 +42,7 @@ class K1BatchProcessor:
 
     def _ensure_directory_structure(self):
         """Ensure required directories exist."""
-        directories = ["cache", "dumps", "logs", "queue", "snapshots"]
+        directories = ["cache", "dumps", "logs", "snapshots"]
 
         for directory in directories:
             if not os.path.exists(directory):
@@ -52,6 +54,13 @@ class K1BatchProcessor:
             shutil.copy("investors.xlsx", os.path.join("snapshots", f"investors_{logger.timestamp}.xlsx"))
         except FileNotFoundError as e:
             print(e)
+
+    def _reset_status(self):
+        """Reset 'email_status' and 'email_batch_timestamp' columns to empty."""
+        investors_df = pd.read_excel("investors.xlsx", converters={"email_batch_timestamp": str})
+        investors_df["email_status"] = ""
+        investors_df["email_batch_timestamp"] = ""
+        investors_df.to_excel("investors.xlsx", index=False)
 
     def _load_cache(self):
         """Attempt to load K-1 entity array from cache."""
@@ -124,7 +133,7 @@ class K1BatchProcessor:
         """Output K-1 array in pretty-print format."""
         logger.write(json.dumps(self.k1_array, indent=2), print_to_terminal=False)
 
-    def create_matching_keys(self):
+    def _create_matching_keys(self):
         """Create keys to match PDFs to investors table."""
         stop_characters_translation_table = str.maketrans({
             " ": "",
@@ -139,6 +148,8 @@ class K1BatchProcessor:
 
     def match_files_and_keys(self):
         """Match K-1 files to investors."""
+        self._create_matching_keys()
+
         investors_df = pd.read_excel("investors.xlsx", converters={"email_batch_timestamp": str})
 
         k1_matching_key_df = pd.DataFrame(self.k1_array)
@@ -153,7 +164,7 @@ class K1BatchProcessor:
         unmatched_k1_files_df = k1_matching_key_df[~k1_matching_key_df["k1_matching_key"].isin(merged_df["k1_matching_key"])].sort_values(by="path")
         print("UNMATCHED FILES:", len(unmatched_k1_files_df), "\n")
         print(f"MATCH SUCCESS: {1 - (len(unmatched_k1_files_df) / len(k1_matching_key_df)):.2%}\n")
-        unmatched_k1_files_df.to_csv(os.path.join("logs", f"unmatched_{logger.timestamp}.csv"), index=False)
+        unmatched_k1_files_df.to_csv(os.path.join("logs", f"unmatched_{logger.timestamp}.csv"))
 
         merged_df = merged_df.drop(columns=["path", "investment_name_from_pdf", "issuing_entity_from_pdf", "receiving_entity_from_pdf"], axis=1)
         merged_df["email_status"] = merged_df.apply(
@@ -164,11 +175,11 @@ class K1BatchProcessor:
         merged_df.to_excel("investors.xlsx", index=False)  # Update main table with filename and status columns
 
         merged_df = merged_df[merged_df["matched_k1_filename"].notna()]
-        merged_df.to_csv(os.path.join("queue", f"matched_{logger.timestamp}.csv"), index=False)  # For logging
+        merged_df.to_csv(os.path.join("logs", f"matched_{logger.timestamp}.csv"))  # For logging
 
     def send_emails(self):
         """Email K-1 PDFs to investors."""
-        investors_df = pd.read_excel("investors.xlsx")
+        investors_df = pd.read_excel("investors.xlsx", converters={"email_batch_timestamp": str})
         investors_df["active"] = investors_df["active"].apply(lambda value: False if pd.isna(value) or value == "nan" else bool(value))
         investors_df["do_not_send_override"] = investors_df["do_not_send_override"].apply(lambda value: False if pd.isna(value) or value == "nan" else bool(value))
 
@@ -260,7 +271,6 @@ Thank you for your continued partnership and trust.
                 email_message["message"]["ccRecipients"] = cc_recipients
 
             try:
-                print(f"START {index + 1:03}: {subject}")
                 response = requests.post(url=api_url, headers=headers, data=json.dumps(email_message))
 
                 if response.status_code == 202:
@@ -272,7 +282,7 @@ Thank you for your continued partnership and trust.
                     investors_to_send_df.at[investor.Index, "email_status"] = f"fail {response.status_code}: {response.text}"
                     investors_to_send_df.at[investor.Index, "email_batch_timestamp"] = None
             except Exception as e:
-                print(f"ERROR {index + 1:03}: {e}")
+                print(f"ERROR {index + 1:03}: {subject}, {e}")
                 investors_to_send_df.at[investor.Index, "email_status"] = f"error {e}"
                 investors_to_send_df.at[investor.Index, "email_batch_timestamp"] = None
 
@@ -283,12 +293,11 @@ Thank you for your continued partnership and trust.
 if __name__ == "__main__":
     tax_year = "2023"
     test_mode = True
-    email_limit = 1
+    email_limit = 5
+    reset_status = True
 
-    k = K1BatchProcessor(tax_year=tax_year, test_mode=test_mode, email_limit=email_limit)
+    k = K1BatchProcessor(tax_year=tax_year, test_mode=test_mode, email_limit=email_limit, reset_status=reset_status)
     k.extract_entities()
-    k.create_matching_keys()
     k.match_files_and_keys()
-    # k.print_k1_array()
     k.send_emails()
     logger.close()
