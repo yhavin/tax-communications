@@ -225,6 +225,8 @@ class K1BatchProcessor:
         base_url = "https://graph.microsoft.com/v1.0"
         api_url = f"{base_url}/users/{self.sender}/sendMail"
 
+        sent_statuses = []  # For logging
+
         for index, investor in enumerate(investors_to_send_df.itertuples(index=True, name="Investor")):
             if self.email_limit is not None and index >= self.email_limit:
                 break
@@ -327,6 +329,16 @@ Thank you for your continued partnership and trust.
                 print(f"ERROR {index + 1:03}: {filename}, {e}")
                 investors_to_send_df.at[investor.Index, "email_status"] = f"error {e}"
                 investors_to_send_df.at[investor.Index, "email_batch_timestamp"] = None
+
+            sent_statuses.append({
+                **investor._asdict(),
+                "email_status": investors_to_send_df.at[investor.Index, "email_status"],
+                "email_batch_timestamp": investors_to_send_df.at[investor.Index, "email_batch_timestamp"]
+            })
+
+        sent_statuses_df = pd.DataFrame(sent_statuses)
+        sent_statuses_df = sent_statuses_df.drop(columns=["Index"])
+        sent_statuses_df.to_csv(os.path.join("logs", f"{logger.timestamp}_sent.csv"), index=False)
 
         investors_df.update(investors_to_send_df[["k1_matching_key", "email_status", "email_batch_timestamp"]])
         investors_df.to_excel("investors.xlsx", index=False)
