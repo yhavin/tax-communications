@@ -253,8 +253,8 @@ Thank you for your continued partnership and trust.
             cc_recipients = []
 
             for i in range(1, 5):  # Max email addresses == 4
-                email_address = getattr(investor, f"email_address_{i}")
-                email_type = getattr(investor, f"email_type_{i}")
+                email_address = str(getattr(investor, f"email_address_{i}"))
+                email_type = str(getattr(investor, f"email_type_{i}"))
 
                 if email_address is not None:
                     recipient = {
@@ -262,9 +262,9 @@ Thank you for your continued partnership and trust.
                             "address": self.sender if self.test_mode else email_address
                         }
                     }
-                    if email_type == "to":
+                    if email_type.lower() == "to":
                         to_recipients.append(recipient)
-                    elif email_type == "cc":
+                    elif email_type.lower() == "cc":
                         cc_recipients.append(recipient)
                     else:  # Default to cc if email type is missing
                         cc_recipients.append(recipient)
