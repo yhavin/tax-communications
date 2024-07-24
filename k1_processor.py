@@ -251,12 +251,13 @@ Thank you for your continued partnership and trust.
 
             to_recipients = []
             cc_recipients = []
+            bcc_recipients = []
 
             for i in range(1, 5):  # Max email addresses == 4
                 email_address = str(getattr(investor, f"email_address_{i}"))
                 email_type = str(getattr(investor, f"email_type_{i}"))
 
-                if email_address is not None:
+                if email_address is not None and email_address != "nan":
                     recipient = {
                         "emailAddress": {
                             "address": self.sender if self.test_mode else email_address
@@ -266,6 +267,8 @@ Thank you for your continued partnership and trust.
                         to_recipients.append(recipient)
                     elif email_type.lower() == "cc":
                         cc_recipients.append(recipient)
+                    elif email_type.lower() == "bcc":
+                        bcc_recipients.append(recipient)
                     else:  # Default to cc if email type is missing
                         cc_recipients.append(recipient)
                         investors_to_send_df.at[investor.Index, f"email_type_{i}"] = "cc"
@@ -274,10 +277,13 @@ Thank you for your continued partnership and trust.
             for internal_recipient in self.internal_recipients:
                 recipient = {
                     "emailAddress": {
-                        "address": self.sender if self.test_mode else internal_recipient
+                        "address": self.sender if self.test_mode else internal_recipient["email_address"]
                     }
                 }
-                cc_recipients.append(recipient)
+                if internal_recipient["email_type"].lower() == "cc":
+                    cc_recipients.append(recipient)
+                elif internal_recipient["email_type"].lower() == "bcc":
+                    bcc_recipients.append(recipient)
                     
             email_message = {
                 "message": {
@@ -300,6 +306,8 @@ Thank you for your continued partnership and trust.
 
             if cc_recipients:
                 email_message["message"]["ccRecipients"] = cc_recipients
+            if bcc_recipients:
+                email_message["message"]["bccRecipients"] = bcc_recipients
 
             try:
                 response = requests.post(url=api_url, headers=headers, data=json.dumps(email_message))
@@ -307,7 +315,8 @@ Thank you for your continued partnership and trust.
                 if response.status_code == 202:
                     joined_to_recipients = ", ".join({recipient["emailAddress"]["address"] for recipient in to_recipients})
                     joined_cc_recipients = ", ".join({recipient["emailAddress"]["address"] for recipient in cc_recipients})
-                    print(f"EMAIL {index + 1:03}: {filename} to [{joined_to_recipients}] and cc [{joined_cc_recipients}]")
+                    joined_bcc_recipients = ", ".join({recipient["emailAddress"]["address"] for recipient in bcc_recipients})
+                    print(f"EMAIL {index + 1:03}: {filename} to [{joined_to_recipients}], cc [{joined_cc_recipients}], bcc [{joined_bcc_recipients}]")
                     investors_to_send_df.at[investor.Index, "email_status"] = "sent"
                     investors_to_send_df.at[investor.Index, "email_batch_timestamp"] = str(logger.timestamp)
                 else:
