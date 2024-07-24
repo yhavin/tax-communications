@@ -29,7 +29,7 @@ class K1BatchProcessor:
         Args:
             sender: Email address from which to send emails.
             internal_recipients: List of internal email addresses to cc on every email.
-            tax_year: The tax year of the K-1 files.
+            tax_year: The tax year of the K-1 files as a YYYY string.
             test_mode: If True, sends all emails to `sender` (defaults to True for safety).
             email_limit: Limit the number of emails sent (useful for testing), otherwise None to send all.
             skip_cache_load: If True, will not use cache to load pre-extracted data to the `k1_array`.
@@ -91,7 +91,7 @@ class K1BatchProcessor:
         """Save K-1 entity array to cache."""
         with open(os.path.join("cache", self.cache), "wb") as f:
             pickle.dump(self.k1_array, f)
-        print(f"\nCACHE: Saved {len(self.k1_array)} items\n")
+        print(f"CACHE: Saved {len(self.k1_array)} items\n")
         
     def _gather_files(self):
         """Gather K-1 PDFs from input folder."""
@@ -215,6 +215,21 @@ class K1BatchProcessor:
 
         investors_to_send_df = investors_df[conditions]
 
+        num_files_ready = len(investors_to_send_df)
+        print(f"AVAILABLE TO SEND: {num_files_ready} files\n")
+
+        if self.email_limit is not None:
+            num_files_to_send = min(self.email_limit, num_files_ready)
+        else:
+            num_files_to_send = num_files_ready
+
+        confirmation = input(f"CAUTION ({"test_mode" if self.test_mode else "live_mode"}): Are you sure you want to send {num_files_to_send} email{"s" if num_files_to_send != 1 else ""} from {self.sender}? (y/n) ")
+        if confirmation.lower() != "y":
+            print("\nEmail sending aborted by user.")
+            return
+        else:
+            print(f"\nSENDING: {num_files_to_send} files\n")
+
         access_token = auth.get_msal_access_token(*auth.get_msal_credentials())
 
         headers = {
@@ -337,8 +352,11 @@ Thank you for your continued partnership and trust.
             })
 
         sent_statuses_df = pd.DataFrame(sent_statuses)
-        sent_statuses_df = sent_statuses_df.drop(columns=["Index"])
-        sent_statuses_df.to_csv(os.path.join("logs", f"{logger.timestamp}_sent.csv"), index=False)
+        try:
+            sent_statuses_df = sent_statuses_df.drop(columns=["Index"])
+            sent_statuses_df.to_csv(os.path.join("logs", f"{logger.timestamp}_sent.csv"), index=False)
+        except KeyError as e:  # Edge case where zero emails get sent
+            print(f"Zero emails sent. No sent log created. {e}")
 
         investors_df.update(investors_to_send_df[["k1_matching_key", "email_status", "email_batch_timestamp"]])
         investors_df.to_excel("investors.xlsx", index=False)

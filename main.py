@@ -38,12 +38,6 @@ if __name__ == "__main__":
     k.match_files_and_keys()
     
     if RUN_SEND_EMAILS:
-        email_number = EMAIL_LIMIT if EMAIL_LIMIT is not None else "all available"
-        confirmation = input(f"CAUTION ({"test_mode" if TEST_MODE else "live_mode"}): Are you sure you want to send {email_number} email{"s" if email_number != 1 else ""} from {SENDER}? (y/n) ")
-        if confirmation.lower() == "y":
-            print("\n")
-            k.send_emails()
-        else:
-            print("\nEmail sending aborted by user.")
+        k.send_emails()
 
     logger.close()
