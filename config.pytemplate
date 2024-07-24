@@ -1,0 +1,30 @@
+"""
+Untracked config file that gets imported to entry point to run the program.
+
+Author: Yakir Havin
+"""
+
+config = {
+    "sender": "yhavin@beitel.com",
+    # "sender": "akessler@beitel.com",
+    "internal_recipients": [
+        {
+            "email_type": "cc",
+            "email_address": "aschmalberg@beitel.com"
+        },
+        {
+            "email_type": "cc",
+            "email_address": "rdancona@beitel.com"
+        },
+        {
+            "email_type": "bcc",
+            "email_address": "akessler@beitel.com"
+        }
+    ],
+    "tax_year": "2023",
+    "test_mode": True,
+    "email_limit": 1,
+    "skip_cache_load": False,
+    "reset_status": False,
+    "run_send_emails": True
+}

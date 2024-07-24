@@ -11,3 +11,4 @@ dumps/
 cache/
 queue/
 snapshots/
+config.py
