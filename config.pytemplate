@@ -24,7 +24,6 @@ config = {
     "tax_year": "2023",
     "test_mode": True,
     "email_limit": 1,
-    "skip_cache_load": False,
-    "reset_status": False,
+    "skip_cache_load": False
     "run_send_emails": True
 }

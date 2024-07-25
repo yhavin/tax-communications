@@ -21,7 +21,6 @@ if __name__ == "__main__":
     TEST_MODE = config["test_mode"]
     EMAIL_LIMIT = config["email_limit"]
     SKIP_CACHE_LOAD = config["skip_cache_load"]
-    RESET_STATUS = config["reset_status"]
     RUN_SEND_EMAILS = config["run_send_emails"]
 
     k = K1BatchProcessor(
@@ -30,8 +29,7 @@ if __name__ == "__main__":
         tax_year=TAX_YEAR, 
         test_mode=TEST_MODE, 
         email_limit=EMAIL_LIMIT, 
-        skip_cache_load=SKIP_CACHE_LOAD,
-        reset_status=RESET_STATUS
+        skip_cache_load=SKIP_CACHE_LOAD
     )
     k.extract_entities()
     # k.print_k1_array()

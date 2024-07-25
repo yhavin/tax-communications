@@ -22,7 +22,7 @@ from logger import logger
 
 
 class K1BatchProcessor:
-    def __init__(self, *, sender: str, internal_recipients: list, tax_year: str, test_mode: bool=True, email_limit: Optional[int]=None, skip_cache_load: bool=False, reset_status: bool=False):
+    def __init__(self, *, sender: str, internal_recipients: list, tax_year: str, test_mode: bool=True, email_limit: Optional[int]=None, skip_cache_load: bool=False):
         """
         Process and email a batch of K-1 files.
 
@@ -33,7 +33,6 @@ class K1BatchProcessor:
             test_mode: If True, sends all emails to `sender` (defaults to True for safety).
             email_limit: Limit the number of emails sent (useful for testing), otherwise None to send all.
             skip_cache_load: If True, will not use cache to load pre-extracted data to the `k1_array`.
-            reset_status: If True, resets the `email_status` and `email_batch_timestamp` columns in `investors.xlsx`.
         """
         self.sender = sender
         self.internal_recipients = internal_recipients
@@ -41,14 +40,11 @@ class K1BatchProcessor:
         self.test_mode = test_mode
         self.email_limit = email_limit
         self.skip_cache_load = skip_cache_load
-        self.reset_status = reset_status
-        print(f"BEGIN EXECUTION: sender={self.sender}, tax_year={self.tax_year}, test_mode={self.test_mode}, email_limit={self.email_limit}, skip_cache_load={self.skip_cache_load}, reset_status={self.reset_status}\n")
+
+        print(f"BEGIN EXECUTION: sender={self.sender}, tax_year={self.tax_year}, test_mode={self.test_mode}, email_limit={self.email_limit}, skip_cache_load={self.skip_cache_load}\n")
 
         self._ensure_directory_structure()
         self._save_investors_snapshot()
-
-        if self.reset_status:
-            self._reset_status()
 
         self.k1_array = []
         self.cache = "k1_array_cache.pkl"
@@ -70,13 +66,6 @@ class K1BatchProcessor:
             shutil.copy("investors.xlsx", os.path.join("snapshots", f"{logger.timestamp}_investors.xlsx"))
         except FileNotFoundError as e:
             print(e)
-
-    def _reset_status(self):
-        """Reset 'email_status' and 'email_batch_timestamp' columns to empty."""
-        investors_df = pd.read_excel("investors.xlsx", converters={"email_batch_timestamp": str})
-        investors_df["email_status"] = ""
-        investors_df["email_batch_timestamp"] = ""
-        investors_df.to_excel("investors.xlsx", index=False)
 
     def _load_cache(self):
         """Load K-1 entity array from cache."""
