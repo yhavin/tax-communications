@@ -1,0 +1,1 @@
+=LOWER(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(A2&"#"&D2&"#"&E2, " ", ""), ".", ""), ",", ""), "'", ""))
