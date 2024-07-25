@@ -6,9 +6,13 @@ A dynamic system to email K-1 PDFs to investors.
 Every tax year we need to send hundreds of K-1 tax forms to investors. We receive these forms from our external accountants. This project automates the process of matching K-1 PDFs to an internal investor contact table and then emailing the attachments with an interpolated email body. The emails are sent via the Outlook API.
 
 ## Code structure
-There is one class `K1BatchProcessor` inside [`k1_processor.py`](k1_processor.py)that handles all the work. The entry point is inside [`main.py`](main.py), and it receives its parameters from `config.py`, which you should set on each code run. Two additional modules are [`auth.py`](auth.py) for handling Microsoft API authentication (more on this later) and [`logger.py`](logger.py) for logging configuration. `config.py` is not tracked since it is constantly changing for each code run, but there is a [`config.pytemplate`](config.pytemplate) file from which to recreate `config.py` if needed.
+- [`k1_processor.py`](k1_processor.py): Contains the `K1BatchProcessor` class that handles all the work
+- [`main.py`](main.py): Entry point
+- `config.py`: Set running parameters here for each code run (not tracked due to constant changing, but can be recreated from [`config.pytemplate`](config.pytemplate))
+- [`auth.py`](auth.py): Microsoft API authentication (more on this below)
+- [`logger.py`](logger.py): Logging configuration
 
-Inside the entry point, you can define variables for the `K1BatchProcessor` arguments, and choose which of the external methods get run. The methods are called from outside the class to allow for step-by-step processing, instead of being forced to run everything in one shot. This is specifically built in as a safeguard because emailing investors and handling tax data is extremely sensitive.
+Inside the entry point, you can choose which of the external methods get run. The methods are called from outside the class to allow for step-by-step processing, instead of being forced to run everything in one shot. This is specifically built in as a safeguard because emailing investors and handling tax data is extremely sensitive.
 
 ## Usage
 1. Manually copy K-1 PDFs into the `files` directory into their respective investment folders. The
