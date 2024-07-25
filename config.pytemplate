@@ -6,7 +6,6 @@ Author: Yakir Havin
 
 config = {
     "sender": <INSERT>,
-    # "sender": <INSERT>,
     "internal_recipients": [
         {
             "email_type": "cc",
