@@ -12,6 +12,7 @@ import pickle
 import re
 import shutil
 from typing import Optional
+import subprocess
 
 import requests
 import pandas as pd
@@ -41,7 +42,11 @@ class K1BatchProcessor:
         self.email_limit = email_limit
         self.skip_cache_load = skip_cache_load
 
-        print(f"BEGIN EXECUTION: sender={self.sender}, tax_year={self.tax_year}, test_mode={self.test_mode}, email_limit={self.email_limit}, skip_cache_load={self.skip_cache_load}\n")
+        print(f"BEGIN EXECUTION: sender={self.sender} | tax_year={self.tax_year} | test_mode={self.test_mode} | email_limit={self.email_limit} | skip_cache_load={self.skip_cache_load}\n")
+
+        self.logs_changed = False
+        self.snapshots_changed = False
+        self.investors_changed = False
 
         self._ensure_directory_structure()
         self._save_investors_snapshot()
@@ -64,6 +69,8 @@ class K1BatchProcessor:
         """Create snapshots of investors.xlsx before any changes get made."""
         try:
             shutil.copy("investors.xlsx", os.path.join("snapshots", f"{logger.timestamp}_investors.xlsx"))
+            self.snapshots_changed = True
+            self._sync_to_s3()
         except FileNotFoundError as e:
             print(e)
 
@@ -81,6 +88,35 @@ class K1BatchProcessor:
         with open(os.path.join("cache", self.cache), "wb") as f:
             pickle.dump(self.k1_array, f)
         print(f"CACHE: Saved {len(self.k1_array)} items\n")
+
+    def _sync_to_s3(self):
+        """Sync logs, snapshots, and investors table to S3 for secure storage."""
+        bucket_name = "tax-communications"
+
+        items_to_sync = {
+            "logs": ("logs", self.logs_changed),
+            "snapshots": ("snapshots", self.snapshots_changed),
+            "investors.xlsx": ("investors.xlsx", self.investors_changed)
+        }
+
+        for local_path, (s3_prefix, changed) in items_to_sync.items():
+            if changed and os.path.exists(local_path):
+                is_dir = os.path.isdir(local_path)
+                s3_path = f"s3://{bucket_name}/{s3_prefix}{"/" if is_dir else ""}"  # Include ending / for directories
+                command = ["aws", "s3", "sync" if is_dir else "cp", local_path, s3_path]
+                if is_dir:
+                    command.extend(["--exclude", ".DS_Store"])
+
+                try:
+                    subprocess.run(command, capture_output=True, check=True, text=True)
+                    print(f"S3: Synced {local_path} to {s3_path}\n")
+                    attr_name = f"{local_path.split(".")[0]}_changed"
+                    setattr(self, attr_name, False)
+                except subprocess.CalledProcessError as e:
+                    print(f"S3 ERROR: Error syncing {local_path} to {s3_path}")
+                    print(e.stderr)
+                except FileNotFoundError:
+                    print("AWS CLI not installed. Please install it to enable syncing to S3: `pip install awscli`")
         
     def _gather_files(self):
         """Gather K-1 PDFs from input folder."""
@@ -104,6 +140,7 @@ class K1BatchProcessor:
                             })
 
         self.k1_array.extend(new_k1_files)
+
         print("GATHER:", f"{len(self.k1_array)} K-1 files ({len(new_k1_files)} new)\n")
 
     def extract_entities(self):
@@ -123,7 +160,6 @@ class K1BatchProcessor:
                                 issuing_entity = lines[line_number + 3].strip()
                                 if issuing_entity.lower() == "investors llc":  # Long line spill error
                                     issuing_entity = lines[line_number + 2].strip() + " " + issuing_entity
-                                # issuing_entity.replace("’", "'")  # Apostrophe text decoding anomaly
                                 issuing_entity = re.sub(r" \(cid:\d{3}\)X", "", issuing_entity)  # PDF decoding anomaly
                                 k1_info["issuing_entity"] = issuing_entity
                             if "Part II Information About the Partner" in line:
@@ -131,11 +167,11 @@ class K1BatchProcessor:
                                 receiving_entity = lines[receiving_entity_index].strip()
                                 if re.search(r"\bst\b", receiving_entity.lower()) or re.search(r"\bstreet\b", receiving_entity.lower()):  # Off-by-one line error
                                     receiving_entity = lines[receiving_entity_index - 1].strip()
-                                # receiving_entity.replace("’", "'")  # Apostrophe text decoding anomaly
                                 k1_info["receiving_entity"] = receiving_entity
                         break  # Stop checking pages after K-1 is found
 
-        self._save_cache()           
+        self._save_cache() 
+
         print("ISSUING:", len([item for item in self.k1_array if item["issuing_entity"] is not None]), "entities")
         print("RECEIVING:", len([item for item in self.k1_array if item["receiving_entity"] is not None]), "entities")
 
@@ -177,6 +213,7 @@ class K1BatchProcessor:
         print("UNMATCHED FILES:", len(unmatched_k1_files_df), "\n")
         print(f"MATCH SUCCESS: {1 - (len(unmatched_k1_files_df) / len(k1_matching_key_df)):.2%}\n")
         unmatched_k1_files_df.to_csv(os.path.join("logs", f"{logger.timestamp}_unmatched.csv"), index=False)
+        self.logs_changed = True
 
         merged_df = merged_df.drop(columns=["path", "investment_name_from_pdf", "issuing_entity_from_pdf", "receiving_entity_from_pdf"], axis=1)
         merged_df["email_status"] = merged_df.apply(
@@ -185,9 +222,8 @@ class K1BatchProcessor:
         )
 
         merged_df.to_excel("investors.xlsx", index=False)  # Update main table with filename and status columns
-
-        merged_df = merged_df[merged_df["matched_k1_filename"].notna()]
-        # merged_df.to_csv(os.path.join("logs", f"matched_{logger.timestamp}.csv", index=False))  # For logging
+        self.investors_changed = True
+        self._sync_to_s3()
 
     def send_emails(self):
         """Email K-1 PDFs to investors."""
@@ -344,8 +380,11 @@ Thank you for your continued partnership and trust.
         try:
             sent_statuses_df = sent_statuses_df.drop(columns=["Index"])
             sent_statuses_df.to_csv(os.path.join("logs", f"{logger.timestamp}_sent.csv"), index=False)
+            self.logs_changed = True
         except KeyError as e:  # Edge case where zero emails get sent
             print(f"Zero emails sent. No sent log created. {e}")
 
         investors_df.update(investors_to_send_df[["k1_matching_key", "email_status", "email_batch_timestamp"]])
         investors_df.to_excel("investors.xlsx", index=False)
+        self.investors_changed = True
+        self._sync_to_s3()
