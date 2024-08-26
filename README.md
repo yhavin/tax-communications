@@ -15,7 +15,7 @@ Every tax year we need to send hundreds of K-1 tax forms to investors. We receiv
 Inside the entry point, you can choose which of the external methods get run. The methods are called from outside the class to allow for step-by-step processing, instead of being forced to run everything in one shot. This is specifically built in as a safeguard because emailing investors and handling tax data is extremely sensitive.
 
 ## Usage
-1. Manually copy K-1 PDFs into the `files` directory into their respective investment folders. The
+1. Manually copy K-1 PDFs into the `files` directory into their respective investment folders.
 2. Ensure `investors.xlsx` contains correct investor information.
 3. Set running parameters in `config.py`, which get imported into the entry point (create `config.py` from [`config.pytemplate`](config.pytemplate) if it does not exist). See the `__init__()` method of `K1BatchProcessor` docstring for explanations of how to set the config parameters.
 4. Instantiating the `K1BatchProcessor` class in the entry point (ensures the correct folder structure as explained below and) gathers the K-1s from the folders to prepare for processing. "Managers" K-1s are excluded as they are not emailed to investors.
