@@ -328,7 +328,7 @@ Thank you for your continued partnership and trust.
                 if email_address is not None and email_address != "nan":
                     recipient = {
                         "emailAddress": {
-                            "address": self.sender if self.test_mode else email_address
+                            "address": self.sender if self.test_mode else email_address.strip()
                         }
                     }
                     if email_type.lower() == "to":
@@ -345,7 +345,7 @@ Thank you for your continued partnership and trust.
             for internal_recipient in self.internal_recipients:
                 recipient = {
                     "emailAddress": {
-                        "address": self.sender if self.test_mode else internal_recipient["email_address"]
+                        "address": self.sender if self.test_mode else internal_recipient["email_address"].strip()
                     }
                 }
                 if internal_recipient["email_type"].lower() == "cc":
