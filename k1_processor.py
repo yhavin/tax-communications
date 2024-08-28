@@ -147,6 +147,22 @@ class K1BatchProcessor:
         """Attempt to extract issuing and receiving entity from PDFs."""
         k1_files_to_extract = [k1_info for k1_info in self.k1_array if k1_info["issuing_entity"] is None and k1_info["receiving_entity"] is None]
 
+        # A True rule indicates that the receiving entity is found one line above what the text extraction found
+        # False rules are built up over time by finding receiving entities with street names in them
+        # Rules are placed in order of preference, since the first match is used
+        receiving_entity_regexp = [
+            (r"\b1021\s+38th\s+street\s+investment\b", False),
+            (r"\b1021\s+38th\s+street\b", True),
+            (r"\b38th\s+street\b", False),
+            (r"\bbenedikt\s+road\b", False),
+            (r"\bst\b", True),
+            (r"\bstreet\b", True),
+            (r"\broad\b", True),
+            (r"\blane\b", True),
+            (r"\bave\b", True),
+            (r"\bavenue\b", True)
+        ]
+
         for index, k1_info in enumerate(k1_files_to_extract):
             print(f"EXTRACT {index + 1:03}: {k1_info["path"]}")
             file_path = os.path.join("files", k1_info["path"])
@@ -165,10 +181,20 @@ class K1BatchProcessor:
                             if "Part II Information About the Partner" in line:
                                 receiving_entity_index = line_number + 3
                                 receiving_entity = lines[receiving_entity_index].strip()
-                                if re.search(r"\bst\b", receiving_entity.lower()) or re.search(r"\bstreet\b", receiving_entity.lower()):  # Off-by-one line error
+                                move_one_line_up = False
+
+                                for pattern, instruction in receiving_entity_regexp:
+                                    if re.search(pattern, receiving_entity.lower()):
+                                        move_one_line_up = instruction
+                                        break  # Stop checking after first match
+
+                                if move_one_line_up:
                                     receiving_entity = lines[receiving_entity_index - 1].strip()
+
                                 k1_info["receiving_entity"] = receiving_entity
                         break  # Stop checking pages after K-1 is found
+            
+            print(f"FOUND:       ISSUING: {issuing_entity}, RECEIVING: {receiving_entity}")
 
         self._save_cache() 
 
