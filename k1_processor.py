@@ -228,12 +228,12 @@ class K1BatchProcessor:
 
         k1_matching_key_df = pd.DataFrame(self.k1_array)
         k1_matching_key_df = k1_matching_key_df.sort_values(by=["investment_name", "receiving_entity"])
-        print("\nK-1 FILES:\n", k1_matching_key_df["investment_name"].value_counts(sort=False))
+        # print("\nK-1 FILES:\n", k1_matching_key_df["investment_name"].value_counts(sort=False))
         
         merged_df = pd.merge(investors_df, k1_matching_key_df, on="k1_matching_key", how="left", suffixes=("", "_from_pdf"))
         merged_df["matched_k1_filename"] = merged_df["path"]
         merged_df = merged_df.sort_values(by=["investment_name", "receiving_entity"])
-        print("\nMATCHED ROWS (may contain duplicate matches):\n", merged_df[merged_df["matched_k1_filename"].notna()]["investment_name"].value_counts(sort=False).rename(index=str.upper), "\n")
+        # print("\nMATCHED ROWS (may contain duplicate matches):\n", merged_df[merged_df["matched_k1_filename"].notna()]["investment_name"].value_counts(sort=False).rename(index=str.upper), "\n")
 
         unmatched_k1_files_df = k1_matching_key_df[~k1_matching_key_df["k1_matching_key"].isin(merged_df["k1_matching_key"])].sort_values(by=["investment_name", "receiving_entity"])
         print("UNMATCHED FILES:", len(unmatched_k1_files_df), "\n")
@@ -259,12 +259,14 @@ class K1BatchProcessor:
 
         conditions = (
             (investors_df["matched_k1_filename"].notna()) & 
-            (investors_df["active"] == True) &
-            (investors_df["do_not_send_override"] == False) &
+            (investors_df["active"]) &
+            (not investors_df["do_not_send_override"]) &
             (investors_df["email_status"] != "sent")
         )
 
         investors_to_send_df = investors_df[conditions]
+
+        print(f"{investors_to_send_df[["investment_name", "issuing_entity", "receiving_entity"]].to_string(index=False)}\n")
 
         num_files_ready = len(investors_to_send_df)
         print(f"AVAILABLE TO SEND: {num_files_ready} files\n")
