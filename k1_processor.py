@@ -436,7 +436,8 @@ Thank you for your continued partnership and trust.
         except KeyError as e:  # Edge case where zero emails get sent
             print(f"Zero emails sent. No sent log created. {e}")
 
-        investors_df.update(investors_to_send_df[["k1_matching_key", "email_status", "email_batch_timestamp"]])
-        investors_df.to_excel("investors.xlsx", index=False)
-        self.investors_changed = True
-        self._sync_to_s3()
+        if not self.test_mode:
+            investors_df.update(investors_to_send_df[["k1_matching_key", "email_status", "email_batch_timestamp"]])
+            investors_df.to_excel("investors.xlsx", index=False)
+            self.investors_changed = True
+            self._sync_to_s3()
