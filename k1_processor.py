@@ -126,18 +126,34 @@ class K1BatchProcessor:
         for asset_folder in os.listdir(root_folder_path):
             asset_folder_path = os.path.join(root_folder_path, asset_folder)
             if os.path.isdir(asset_folder_path):
-                for file in os.listdir(asset_folder_path):
-                    if file.lower().endswith(".pdf"):
-                        if "managers" in file.lower():
-                            continue
-                        file_path = f"{asset_folder}/{file}"
-                        if not any(k1["path"] == file_path for k1 in self.k1_array):
-                            new_k1_files.append({
-                                "path": f"{asset_folder}/{file}",
-                                "investment_name": asset_folder,
-                                "issuing_entity": None,
-                                "receiving_entity": None
-                            })
+                for item in os.listdir(asset_folder_path):
+                    item_path = os.path.join(asset_folder_path, item)
+
+                    if os.path.isfile(item_path):  # K-1 PDFs directly inside asset folder
+                        if item.lower().endswith(".pdf"):
+                            if "managers" in item.lower() or "manager" in item.lower():
+                                continue
+                            file_path = f"{asset_folder}/{item}"
+                            if not any(k1["path"] == file_path for k1 in self.k1_array):
+                                new_k1_files.append({
+                                    "path": file_path,
+                                    "investment_name": asset_folder,
+                                    "issuing_entity": None,
+                                    "receiving_entity": None
+                                })
+                    elif os.path.isdir(item_path):  # K-1 PDFs inside subfolders of asset folder
+                        for file in os.listdir(item_path):
+                            if file.lower().endswith(".pdf"):
+                                if "managers" in item.lower() or "manager" in item.lower():
+                                    continue
+                            file_path = f"{asset_folder}/{item}/{file}"
+                            if not any(k1["path"] == file_path for k1 in self.k1_array):
+                                new_k1_files.append({
+                                    "path": file_path,
+                                    "investment_name": asset_folder,
+                                    "issuing_entity": None,
+                                    "receiving_entity": None
+                                })
 
         self.k1_array.extend(new_k1_files)
 
@@ -160,7 +176,14 @@ class K1BatchProcessor:
             (r"\broad\b", True),
             (r"\blane\b", True),
             (r"\bave\b", True),
-            (r"\bavenue\b", True)
+            (r"\bavenue\b", True),
+            (r"\bcourt\b", True),
+            (r"\bct\b", True),
+            (r"\bdrive\b", True),
+            (r"\bway\b", True),
+            (r"\bunit\b", True),
+            (r"\bcircle\b", True),
+            (r"\bpo box\b", True)
         ]
 
         for index, k1_info in enumerate(k1_files_to_extract):
@@ -227,6 +250,7 @@ class K1BatchProcessor:
         investors_df = pd.read_excel("investors.xlsx", converters={"email_batch_timestamp": str})
 
         k1_matching_key_df = pd.DataFrame(self.k1_array)
+
         k1_matching_key_df = k1_matching_key_df.sort_values(by=["investment_name", "receiving_entity"])
         # print("\nK-1 FILES:\n", k1_matching_key_df["investment_name"].value_counts(sort=False))
         
@@ -260,7 +284,7 @@ class K1BatchProcessor:
         conditions = (
             (investors_df["matched_k1_filename"].notna()) & 
             (investors_df["active"]) &
-            (not investors_df["do_not_send_override"]) &
+            (~investors_df["do_not_send_override"]) &
             (investors_df["email_status"] != "sent")
         )
 
