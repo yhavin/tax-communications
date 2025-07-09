@@ -359,25 +359,25 @@ Thank you for your continued partnership and trust.
                     }
                     if email_type.lower() == "to":
                         to_recipients.append(recipient)
-                    elif email_type.lower() == "cc":
+                    elif not self.test_mode and email_type.lower() == "cc":  # Only send cc in live mode
                         cc_recipients.append(recipient)
-                    elif email_type.lower() == "bcc":
+                    elif not self.test_mode and email_type.lower() == "bcc":  # Only send bcc in live mode
                         bcc_recipients.append(recipient)
-                    else:  # Default to cc if email type is missing
+                    elif not self.test_mode:  # Default to cc if email type is missing (and only send in live mode)
                         cc_recipients.append(recipient)
                         investors_to_send_df.at[investor.Index, f"email_type_{i}"] = "cc"
 
-            # Always cc to internal Beitel recipients
-            for internal_recipient in self.internal_recipients:
-                recipient = {
-                    "emailAddress": {
-                        "address": self.sender if self.test_mode else internal_recipient["email_address"].strip()
+            if not self.test_mode:  # Always cc to internal Beitel recipients (in live mode)
+                for internal_recipient in self.internal_recipients:
+                    recipient = {
+                        "emailAddress": {
+                            "address": self.sender if self.test_mode else internal_recipient["email_address"].strip()
+                        }
                     }
-                }
-                if internal_recipient["email_type"].lower() == "cc":
-                    cc_recipients.append(recipient)
-                elif internal_recipient["email_type"].lower() == "bcc":
-                    bcc_recipients.append(recipient)
+                    if internal_recipient["email_type"].lower() == "cc":
+                        cc_recipients.append(recipient)
+                    elif internal_recipient["email_type"].lower() == "bcc":
+                        bcc_recipients.append(recipient)
                     
             email_message = {
                 "message": {
