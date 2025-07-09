@@ -11,4 +11,6 @@ dumps/
 cache/
 queue/
 snapshots/
+archive/
 config.py
+vibes.py
