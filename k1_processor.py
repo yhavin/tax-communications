@@ -144,7 +144,7 @@ class K1BatchProcessor:
                     elif os.path.isdir(item_path):  # K-1 PDFs inside subfolders of asset folder
                         for file in os.listdir(item_path):
                             if file.lower().endswith(".pdf"):
-                                if "managers" in item.lower() or "manager" in item.lower():
+                                if "managers" in file.lower() or "manager" in file.lower():
                                     continue
                             file_path = f"{asset_folder}/{item}/{file}"
                             if not any(k1["path"] == file_path for k1 in self.k1_array):
@@ -174,16 +174,20 @@ class K1BatchProcessor:
             (r"\bst\b", True),
             (r"\bstreet\b", True),
             (r"\broad\b", True),
+            (r"\brd\b", True),
             (r"\blane\b", True),
             (r"\bave\b", True),
             (r"\bavenue\b", True),
             (r"\bcourt\b", True),
             (r"\bct\b", True),
             (r"\bdrive\b", True),
+            (r"\bdr\b", True),
             (r"\bway\b", True),
             (r"\bunit\b", True),
             (r"\bcircle\b", True),
-            (r"\bpo box\b", True)
+            (r"\bpo box\b", True),
+            (r"\bnachal\b", True),
+            (r"\bgrove\b", True)
         ]
 
         for index, k1_info in enumerate(k1_files_to_extract):
