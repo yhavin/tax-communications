@@ -146,14 +146,14 @@ class K1BatchProcessor:
                             if file.lower().endswith(".pdf"):
                                 if "managers" in file.lower() or "manager" in file.lower():
                                     continue
-                            file_path = f"{asset_folder}/{item}/{file}"
-                            if not any(k1["path"] == file_path for k1 in self.k1_array):
-                                new_k1_files.append({
-                                    "path": file_path,
-                                    "investment_name": asset_folder,
-                                    "issuing_entity": None,
-                                    "receiving_entity": None
-                                })
+                                file_path = f"{asset_folder}/{item}/{file}"
+                                if not any(k1["path"] == file_path for k1 in self.k1_array):
+                                    new_k1_files.append({
+                                        "path": file_path,
+                                        "investment_name": asset_folder,
+                                        "issuing_entity": None,
+                                        "receiving_entity": None
+                                    })
 
         self.k1_array.extend(new_k1_files)
 
