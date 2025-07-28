@@ -187,7 +187,8 @@ class K1BatchProcessor:
             (r"\bcircle\b", True),
             (r"\bpo box\b", True),
             (r"\bnachal\b", True),
-            (r"\bgrove\b", True)
+            (r"\bgrove\b", True),
+            (r"\bc/o\b", True)
         ]
 
         for index, k1_info in enumerate(k1_files_to_extract):
@@ -208,6 +209,7 @@ class K1BatchProcessor:
                             if "Part II Information About the Partner" in line:
                                 receiving_entity_index = line_number + 3
                                 receiving_entity = lines[receiving_entity_index].strip()
+
                                 move_one_line_up = False
 
                                 for pattern, instruction in receiving_entity_regexp:
@@ -218,14 +220,16 @@ class K1BatchProcessor:
                                 if move_one_line_up:
                                     receiving_entity = lines[receiving_entity_index - 1].strip()
 
+                                match = re.search(r"\s+[A-Za-z]\s+\d", receiving_entity)  # Remove unwanted extract text from Part III table
+                                if match:
+                                    receiving_entity = receiving_entity[:match.start()].strip()
+
                                 k1_info["receiving_entity"] = receiving_entity
                         break  # Stop checking pages after K-1 is found
             
             print(f"FOUND:       ISSUING: {issuing_entity}, RECEIVING: {receiving_entity}")
 
-        self._save_cache() 
-
-        print("ISSUING:", len([item for item in self.k1_array if item["issuing_entity"] is not None]), "entities")
+        print("\nISSUING:", len([item for item in self.k1_array if item["issuing_entity"] is not None]), "entities")
         print("RECEIVING:", len([item for item in self.k1_array if item["receiving_entity"] is not None]), "entities")
 
     def print_k1_array(self):
@@ -256,12 +260,10 @@ class K1BatchProcessor:
         k1_matching_key_df = pd.DataFrame(self.k1_array)
 
         k1_matching_key_df = k1_matching_key_df.sort_values(by=["investment_name", "receiving_entity"])
-        # print("\nK-1 FILES:\n", k1_matching_key_df["investment_name"].value_counts(sort=False))
         
         merged_df = pd.merge(investors_df, k1_matching_key_df, on="k1_matching_key", how="left", suffixes=("", "_from_pdf"))
         merged_df["matched_k1_filename"] = merged_df["path"]
         merged_df = merged_df.sort_values(by=["investment_name", "receiving_entity"])
-        # print("\nMATCHED ROWS (may contain duplicate matches):\n", merged_df[merged_df["matched_k1_filename"].notna()]["investment_name"].value_counts(sort=False).rename(index=str.upper), "\n")
 
         unmatched_k1_files_df = k1_matching_key_df[~k1_matching_key_df["k1_matching_key"].isin(merged_df["k1_matching_key"])].sort_values(by=["investment_name", "receiving_entity"])
         print("UNMATCHED FILES:", len(unmatched_k1_files_df), "\n")
@@ -278,6 +280,12 @@ class K1BatchProcessor:
         merged_df.to_excel("investors.xlsx", index=False)  # Update main table with filename and status columns
         self.investors_changed = True
         self._sync_to_s3()
+
+        k1_matched_keys = set(merged_df[merged_df["matched_k1_filename"].notna()]["k1_matching_key"])
+        matched_k1_files = [k1 for k1 in self.k1_array if k1["k1_matching_key"] in k1_matched_keys]
+        self.k1_array = matched_k1_files
+        self._save_cache()
+
 
     def send_emails(self):
         """Email K-1 PDFs to investors."""
