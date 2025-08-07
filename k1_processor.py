@@ -359,7 +359,7 @@ Thank you for your continued partnership and trust.
             cc_recipients = []
             bcc_recipients = []
 
-            for i in range(1, 5):  # Max email addresses == 4
+            for i in range(1, 6):  # Max email addresses == 5
                 email_address = str(getattr(investor, f"email_address_{i}"))
                 email_type = str(getattr(investor, f"email_type_{i}"))
 
