@@ -188,7 +188,8 @@ class K1BatchProcessor:
             (r"\bpo box\b", True),
             (r"\bnachal\b", True),
             (r"\bgrove\b", True),
-            (r"\bc/o\b", True)
+            (r"\bc/o\b", True),
+            (r"\bplaza\b", True)
         ]
 
         for index, k1_info in enumerate(k1_files_to_extract):
