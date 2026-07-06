@@ -125,35 +125,57 @@ class K1BatchProcessor:
 
         for asset_folder in os.listdir(root_folder_path):
             asset_folder_path = os.path.join(root_folder_path, asset_folder)
-            if os.path.isdir(asset_folder_path):
-                for item in os.listdir(asset_folder_path):
-                    item_path = os.path.join(asset_folder_path, item)
+            # if os.path.isdir(asset_folder_path):
+            #     for item in os.listdir(asset_folder_path):
+            #         item_path = os.path.join(asset_folder_path, item)
 
-                    if os.path.isfile(item_path):  # K-1 PDFs directly inside asset folder
-                        if item.lower().endswith(".pdf"):
-                            if "managers" in item.lower() or "manager" in item.lower():
-                                continue
-                            file_path = f"{asset_folder}/{item}"
-                            if not any(k1["path"] == file_path for k1 in self.k1_array):
-                                new_k1_files.append({
-                                    "path": file_path,
-                                    "investment_name": asset_folder,
-                                    "issuing_entity": None,
-                                    "receiving_entity": None
-                                })
-                    elif os.path.isdir(item_path):  # K-1 PDFs inside subfolders of asset folder
-                        for file in os.listdir(item_path):
-                            if file.lower().endswith(".pdf"):
-                                if "managers" in file.lower() or "manager" in file.lower():
-                                    continue
-                                file_path = f"{asset_folder}/{item}/{file}"
-                                if not any(k1["path"] == file_path for k1 in self.k1_array):
-                                    new_k1_files.append({
-                                        "path": file_path,
-                                        "investment_name": asset_folder,
-                                        "issuing_entity": None,
-                                        "receiving_entity": None
-                                    })
+            #         if os.path.isfile(item_path):  # K-1 PDFs directly inside asset folder
+            #             if item.lower().endswith(".pdf"):
+            #                 if "managers" in item.lower() or "manager" in item.lower():
+            #                     continue
+            #                 file_path = f"{asset_folder}/{item}"
+            #                 if not any(k1["path"] == file_path for k1 in self.k1_array):
+            #                     new_k1_files.append({
+            #                         "path": file_path,
+            #                         "investment_name": asset_folder,
+            #                         "issuing_entity": None,
+            #                         "receiving_entity": None
+            #                     })
+            #         elif os.path.isdir(item_path):  # K-1 PDFs inside subfolders of asset folder
+            #             for file in os.listdir(item_path):
+            #                 if file.lower().endswith(".pdf"):
+            #                     if "managers" in file.lower() or "manager" in file.lower():
+            #                         continue
+            #                     file_path = f"{asset_folder}/{item}/{file}"
+            #                     if not any(k1["path"] == file_path for k1 in self.k1_array):
+            #                         new_k1_files.append({
+            #                             "path": file_path,
+            #                             "investment_name": asset_folder,
+            #                             "issuing_entity": None,
+            #                             "receiving_entity": None
+            #                         })
+
+            if not os.path.isdir(asset_folder_path):
+                continue  # Skip non-folders directly inside files/
+
+            for dirpath, _, filenames in os.walk(asset_folder_path):
+                for file in filenames:
+                    if not file.lower().endswith(".pdf"):
+                        continue  # Skip non-PDFs
+                    if "manager" in file.lower():
+                        continue  # Skip manager files
+                    if "k1" not in file.lower():
+                        continue  # Skip non-K1 files (e.g., e-file authorization forms)
+
+                    file_path = os.path.relpath(os.path.join(dirpath, file), root_folder_path)
+
+                    if not any(k1["path"] == file_path for k1 in self.k1_array):
+                        new_k1_files.append({
+                            "path": file_path,
+                            "investment_name": asset_folder,
+                            "issuing_entity": None,
+                            "receiving_entity": None
+                        })
 
         self.k1_array.extend(new_k1_files)
 
@@ -235,7 +257,7 @@ class K1BatchProcessor:
 
     def print_k1_array(self):
         """Output K-1 array in pretty-print format."""
-        logger.write(json.dumps(self.k1_array, indent=2), print_to_terminal=False)
+        logger.write(f"\n{json.dumps(self.k1_array, indent=2)}\n\n", print_to_terminal=False)
 
     def _create_matching_keys(self):
         """Create keys to match PDFs to investors table."""
