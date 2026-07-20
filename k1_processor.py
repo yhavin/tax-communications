@@ -212,7 +212,10 @@ class K1BatchProcessor:
             (r"\bgrove\b", True),
             (r"\bc/o\b", True),
             (r"\bplaza\b", True),
-            (r"\bparkway\b", True)
+            (r"\bparkway\b", True),
+            (r"\bramapo mountain\b", True),
+            (r"\bmonroe place\b", True),
+            (r"\bminchat yitzchak\b", True)
         ]
 
         for index, k1_info in enumerate(k1_files_to_extract):
